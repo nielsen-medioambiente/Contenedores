@@ -1,0 +1,1899 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trazabilidad de Residuos Mineros v2 — Google Sheets</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ══════════════════════════════════════════
+   CONFIGURACIÓN: pegá acá la URL de tu Web App
+   (Extensiones → Apps Script → Implementar → Nueva implementación → App web)
+   Ejemplo: https://script.google.com/macros/s/XXXXX/exec
+   ══════════════════════════════════════════ */
+/* var SHEETS_URL se define en el bloque <script> al final */
+
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #1c2230; --bg4: #222836;
+  --border: #30363d; --border2: #404755; --border3: #505869;
+  --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+  --amber: #f0a300; --amber2: #ffcc4d; --amber-dim: rgba(240,163,0,0.12); --amber-glow: rgba(240,163,0,0.25);
+  --green: #3fb950; --green2: #56d364; --green-dim: rgba(63,185,80,0.12);
+  --blue: #58a6ff; --blue2: #79b8ff; --blue-dim: rgba(88,166,255,0.12);
+  --red: #f85149; --red2: #ff7b72; --red-dim: rgba(248,81,73,0.12);
+  --teal: #2ea8a8; --teal-dim: rgba(46,168,168,0.12);
+  --purple: #bc8cff; --purple-dim: rgba(188,140,255,0.12);
+  --orange: #e09452; --orange-dim: rgba(224,148,82,0.12);
+  --r: 8px; --rl: 12px; --rxl: 16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+/* ── TOAST NOTIFICATION ── */
+.toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;align-items:center;gap:10px;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);
+  padding:12px 18px;font-size:13px;color:var(--text);
+  box-shadow:0 8px 32px rgba(0,0,0,.5);transform:translateY(100px);opacity:0;
+  transition:all .3s cubic-bezier(.4,0,.2,1);pointer-events:none;max-width:340px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.success{border-color:var(--green);}
+.toast.error{border-color:var(--red);}
+.toast.loading{border-color:var(--amber);}
+.toast-icon{font-size:18px;flex-shrink:0;}
+.toast-msg{flex:1;line-height:1.4;}
+
+/* ── CONFIG BANNER ── */
+.config-banner{background:var(--amber-dim);border:1px solid rgba(240,163,0,.4);border-radius:var(--r);
+  padding:10px 16px;margin:12px 28px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--amber2);}
+.config-banner a{color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:11px;text-decoration:underline;cursor:pointer;}
+#configBanner{display:none;}
+
+/* ── SIDEBAR NAV ── */
+.app{display:flex;min-height:100vh;}
+.sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.sidebar-logo{padding:20px 18px 16px;border-bottom:1px solid var(--border);}
+.logo-mark{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:32px;height:32px;background:var(--amber);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo-icon svg{width:18px;height:18px;}
+.logo-text{font-size:13px;font-weight:700;color:var(--text);line-height:1.2;}
+.logo-sub{font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;}
+.nav-section{padding:12px 10px 4px;}
+.nav-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-family:'IBM Plex Mono',monospace;padding:0 8px;margin-bottom:4px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;margin-bottom:2px;}
+.nav-item:hover{background:var(--bg3);color:var(--text);}
+.nav-item.active{background:var(--amber-dim);color:var(--amber2);border:1px solid rgba(240,163,0,.2);}
+.nav-item .ni{width:16px;text-align:center;font-size:14px;}
+.nav-item .badge{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;font-size:10px;font-family:'IBM Plex Mono',monospace;padding:1px 6px;min-width:18px;text-align:center;}
+.sidebar-footer{margin-top:auto;padding:14px;border-top:1px solid var(--border);}
+.sys-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);}
+.dot-live{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;flex-shrink:0;}
+.dot-offline{background:var(--red)!important;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.8);}}
+
+/* ── MAIN CONTENT ── */
+.content{flex:1;min-width:0;display:flex;flex-direction:column;}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.page-title{font-size:16px;font-weight:600;}
+.topbar-actions{display:flex;gap:8px;align-items:center;}
+.btn{border-radius:var(--r);padding:7px 14px;font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2);transition:all .15s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn:hover{background:var(--bg4);color:var(--text);border-color:var(--border2);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-primary{background:var(--amber);color:#0d1117;border-color:var(--amber);font-weight:600;}
+.btn-primary:hover{opacity:.85;color:#0d1117;}
+.btn-success{background:var(--green-dim);color:var(--green2);border-color:var(--green);}
+.btn-danger{background:var(--red-dim);color:var(--red2);border-color:var(--red);}
+.page-body{padding:24px 28px;flex:1;}
+
+/* ── VIEWS ── */
+.view{display:none;}
+.view.active{display:block;}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat-card.amber::before{background:var(--amber);}
+.stat-card.green::before{background:var(--green);}
+.stat-card.blue::before{background:var(--blue);}
+.stat-card.purple::before{background:var(--purple);}
+.stat-card.red::before{background:var(--red);}
+.stat-card.orange::before{background:var(--orange);}
+.stat-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:6px;}
+.stat-val{font-size:24px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.stat-sub{font-size:11px;color:var(--text2);margin-top:4px;}
+.stat-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:28px;opacity:.15;}
+
+/* ── LOADING STATE ── */
+.loading-overlay{position:fixed;inset:0;background:rgba(13,17,23,.85);z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.loading-overlay.hidden{display:none;}
+.spinner{width:40px;height:40px;border:3px solid var(--border2);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:13px;color:var(--text2);font-family:'IBM Plex Mono',monospace;}
+
+/* ── CONTROLS ── */
+.controls{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+.search-wrap{position:relative;flex:1;min-width:180px;}
+.search-wrap input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:8px 12px 8px 34px;font-size:13px;font-family:'IBM Plex Mono',monospace;outline:none;transition:border-color .2s;}
+.search-wrap input:focus{border-color:var(--amber);}
+.search-wrap .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;}
+select.ctrl{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:8px 10px;font-size:12px;font-family:'IBM Plex Mono',monospace;outline:none;cursor:pointer;}
+
+/* ── CONTAINER CARDS ── */
+.cards-list{display:flex;flex-direction:column;gap:12px;}
+.c-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;transition:border-color .2s;}
+.c-card:hover{border-color:var(--border2);}
+.c-card.expanded{border-color:var(--amber);}
+.c-card.alert-card{border-left:3px solid var(--red);}
+.card-head{display:grid;grid-template-columns:48px 1fr auto;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;}
+.cid-box{width:48px;height:48px;background:var(--bg3);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.cid-box span{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:var(--amber);text-align:center;line-height:1.2;}
+.card-top-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px;}
+.cid-text{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:var(--text);}
+.r-badge{font-size:10px;font-family:'IBM Plex Mono',monospace;padding:2px 8px;border-radius:20px;font-weight:500;}
+.alert-icon{font-size:14px;animation:shake 1s ease-in-out infinite;}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-2px);}75%{transform:translateX(2px);}}
+.card-meta{display:flex;gap:14px;flex-wrap:wrap;}
+.cm{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;}
+.card-right-col{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
+.p-badge{font-size:11px;font-family:'IBM Plex Mono',monospace;padding:3px 10px;border-radius:20px;font-weight:500;white-space:nowrap;}
+.chevron{color:var(--text3);transition:transform .25s;font-size:14px;margin-top:2px;}
+.expanded .chevron{transform:rotate(180deg);}
+
+/* ── DETAIL PANEL ── */
+.card-body{display:none;border-top:1px solid var(--border);background:var(--bg3);}
+.expanded .card-body{display:block;}
+.card-body-inner{padding:20px;}
+.tl-wrap{margin-bottom:20px;}
+.sec-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:14px;}
+.timeline{position:relative;display:flex;align-items:flex-start;justify-content:space-between;padding:0 24px;}
+.timeline::before{content:'';position:absolute;top:20px;left:24px;right:24px;height:2px;background:var(--border);}
+.tl-progress{position:absolute;top:20px;left:24px;height:2px;background:linear-gradient(90deg,var(--amber),var(--amber2));transition:width .7s ease;border-radius:1px;}
+.tl-step{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;z-index:1;flex:1;max-width:110px;}
+.tl-node{width:40px;height:40px;border-radius:50%;border:2px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .3s;flex-shrink:0;}
+.tl-step.done .tl-node{border-color:var(--amber);background:var(--amber-dim);}
+.tl-step.active .tl-node{border-color:var(--amber);background:var(--amber);box-shadow:0 0 14px var(--amber-glow);animation:glow-node 2s ease-in-out infinite;color:#0d1117;}
+@keyframes glow-node{0%,100%{box-shadow:0 0 14px var(--amber-glow);}50%{box-shadow:0 0 24px rgba(240,163,0,.5);}}
+.tl-lbl{font-size:10px;font-weight:500;color:var(--text3);text-align:center;line-height:1.3;max-width:88px;}
+.tl-step.done .tl-lbl,.tl-step.active .tl-lbl{color:var(--text);}
+.tl-date{font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text3);text-align:center;}
+.tl-step.active .tl-date{color:var(--amber);}
+.d-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:16px;}
+.d-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 13px;}
+.d-key{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:3px;}
+.d-val{font-size:12px;font-weight:500;color:var(--text);font-family:'IBM Plex Mono',monospace;word-break:break-word;}
+.phase-btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.p-btn{background:var(--bg2);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:11px;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .2s;}
+.p-btn:hover{border-color:var(--amber);color:var(--amber);}
+.p-btn.current{background:var(--amber);color:#0d1117;border-color:var(--amber);font-weight:600;}
+.hist-list{display:flex;flex-direction:column;gap:0;}
+.hist-item{display:flex;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);}
+.hist-item:last-child{border-bottom:none;}
+.hist-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);flex-shrink:0;margin-top:5px;}
+.hist-dot.old{background:var(--text3);}
+.hist-action{font-size:12px;color:var(--text);font-weight:500;}
+.hist-meta{font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+
+/* Firma */
+.firma-area{margin-top:14px;}
+.firma-box{background:var(--bg2);border:1px dashed var(--border2);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;gap:8px;}
+.firma-canvas{background:#fff;border-radius:4px;touch-action:none;cursor:crosshair;}
+.firma-actions{display:flex;gap:8px;}
+.firma-done{background:var(--green-dim);border:1px solid var(--green);color:var(--green2);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .2s;}
+.firma-done:hover{background:var(--green);color:#0d1117;}
+.firma-clear{background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
+.firma-img{max-width:100%;border:1px solid var(--border);border-radius:4px;}
+.firma-saved{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--green2);font-family:'IBM Plex Mono',monospace;}
+
+/* Alertas */
+.alert-list{display:flex;flex-direction:column;gap:10px;}
+.alert-row{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:14px;}
+.alert-row.warn{border-left-color:var(--amber);}
+.alert-ico{font-size:22px;flex-shrink:0;}
+.alert-content{flex:1;}
+.alert-title{font-size:13px;font-weight:600;margin-bottom:2px;}
+.alert-desc{font-size:12px;color:var(--text2);}
+.alert-time{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);white-space:nowrap;}
+
+/* Mapa */
+.map-container{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;}
+.map-legend{display:flex;gap:16px;flex-wrap:wrap;padding:14px 20px;border-top:1px solid var(--border);}
+.map-leg-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);}
+.map-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+/* Historial global */
+.history-table{width:100%;border-collapse:collapse;}
+.history-table th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-family:'IBM Plex Mono',monospace;padding:8px 12px;border-bottom:1px solid var(--border);font-weight:500;}
+.history-table td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text2);}
+.history-table tr:last-child td{border-bottom:none;}
+.history-table td:first-child{color:var(--text);}
+.history-table tr:hover td{background:var(--bg3);}
+
+/* Modals */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;padding:20px;}
+.overlay.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);width:100%;max-width:540px;max-height:90vh;overflow-y:auto;}
+.mh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.mh-title{font-size:15px;font-weight:600;}
+.mc{background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1;}
+.mc:hover{background:var(--bg3);color:var(--text);}
+.mb{padding:20px;}
+.mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+.fg{margin-bottom:14px;}
+.fl{font-size:11px;color:var(--text2);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;display:block;}
+.fi{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:8px 11px;font-size:13px;font-family:'IBM Plex Mono',monospace;outline:none;transition:border-color .2s;}
+.fi:focus{border-color:var(--amber);}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* URL config modal */
+.url-hint{font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:6px;line-height:1.5;}
+.url-steps{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-top:10px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--text2);line-height:1.8;}
+.url-steps span{color:var(--amber);}
+
+/* type/phase colors */
+.tp-peligroso{background:var(--red-dim);border-color:var(--red)!important;color:var(--red2);}
+.tp-reciclable{background:var(--blue-dim);border-color:var(--blue)!important;color:var(--blue2);}
+.tp-organico{background:var(--green-dim);border-color:var(--green)!important;color:var(--green2);}
+.tp-mezcla{background:var(--teal-dim);border-color:var(--teal)!important;color:var(--teal);}
+.ph-campamento{background:var(--amber-dim);color:var(--amber2);border:1px solid rgba(240,163,0,.3);}
+.ph-transito{background:var(--purple-dim);color:var(--purple);border:1px solid rgba(188,140,255,.3);}
+.ph-empresa{background:var(--blue-dim);color:var(--blue2);border:1px solid rgba(88,166,255,.3);}
+.ph-disposicion{background:var(--green-dim);color:var(--green2);border:1px solid rgba(63,185,80,.3);}
+
+.empty-msg{text-align:center;padding:48px 20px;color:var(--text3);font-size:13px;}
+.sheets-badge{display:inline-flex;align-items:center;gap:4px;background:var(--green-dim);border:1px solid var(--green);color:var(--green2);border-radius:20px;padding:3px 10px;font-size:10px;font-family:'IBM Plex Mono',monospace;}
+
+@media(max-width:700px){
+  .sidebar{width:56px;min-width:56px;}
+  .sidebar .logo-text,.sidebar .logo-sub,.sidebar .nav-label,.nav-item span:not(.ni),.nav-item .badge{display:none;}
+  #chartsGrid{grid-template-columns:1fr!important;}
+  .sidebar-footer{display:none;}
+  .page-body{padding:16px;}
+  .topbar{padding:12px 16px;}
+  .fr{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Cargando datos desde Google Sheets...</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">✅</span>
+  <span class="toast-msg" id="toastMsg"></span>
+</div>
+
+<div class="app">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0d1117" stroke-width="2.2" stroke-linecap="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">ResTrack</div>
+        <div class="logo-sub">v2.0 · Sheets</div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Principal</div>
+    <div class="nav-item active" onclick="showView('dashboard')">
+      <span class="ni">📊</span><span>Dashboard</span>
+    </div>
+    <div class="nav-item" onclick="showView('contenedores')">
+      <span class="ni">📦</span><span>Contenedores</span>
+    </div>
+    <div class="nav-item" onclick="showView('mapa')">
+      <span class="ni">🗺️</span><span>Mapa de Ruta</span>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Seguimiento</div>
+    <div class="nav-item" onclick="showView('historial')">
+      <span class="ni">📋</span><span>Historial</span>
+    </div>
+    <div class="nav-item" onclick="showView('alertas')">
+      <span class="ni">🔔</span><span>Alertas</span>
+      <span class="badge" id="alertBadge">0</span>
+    </div>
+    <div class="nav-item" onclick="showView('tipos')">
+      <span class="ni">🗂️</span><span>Tipos de Contenedor</span>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Exportar</div>
+    <div class="nav-item" onclick="exportPDF()">
+      <span class="ni">📄</span><span>Exportar PDF</span>
+    </div>
+    <div class="nav-item" onclick="reloadFromSheets()">
+      <span class="ni">🔄</span><span>Sincronizar</span>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Config</div>
+    <div class="nav-item" onclick="openUrlConfig()">
+      <span class="ni">⚙️</span><span>Configurar URL</span>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="sys-status">
+      <div class="dot-live" id="statusDot"></div>
+      <span id="statusText">Conectando...</span>
+    </div>
+  </div>
+</nav>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- CONFIG BANNER -->
+  <div class="config-banner" id="configBanner">
+    ⚠️ <strong>URL de Web App no configurada.</strong> &nbsp;
+    <a onclick="openUrlConfig()">Configurar ahora →</a>
+    &nbsp;Los datos se guardan localmente hasta que configures la URL.
+  </div>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="page-title" id="pageTitle">Dashboard</div>
+      <span class="sheets-badge" id="sheetsBadge" style="display:none;">📊 Google Sheets</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" onclick="reloadFromSheets()" title="Sincronizar con Sheets">🔄</button>
+      <button class="btn btn-primary" onclick="openModal()">+ Nuevo Contenedor</button>
+    </div>
+  </div>
+
+  <div class="page-body">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="view active" id="view-dashboard">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;">
+          <div class="sec-lbl" style="margin-bottom:12px;">Distribución por tipo</div>
+          <div id="typeChart"></div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;">
+          <div class="sec-lbl" style="margin-bottom:12px;">Estado de fases</div>
+          <div id="phaseChart"></div>
+        </div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;">
+        <div class="sec-lbl" style="margin-bottom:12px;">Últimos movimientos</div>
+        <div id="recentMoves"></div>
+      </div>
+    </div>
+
+    <!-- ── CONTENEDORES ── -->
+    <div class="view" id="view-contenedores">
+      <div class="controls">
+        <div class="search-wrap">
+          <span class="si">🔍</span>
+          <input type="text" id="searchInput" placeholder="Buscar ID, conductor, camión..." oninput="renderCards()">
+        </div>
+        <select class="ctrl" id="filterFase" onchange="renderCards()">
+          <option value="">Todas las fases</option>
+          <option value="base_nielsen">Base Nielsen</option>
+          <option value="transito_ida">En Tránsito (ida)</option>
+          <option value="campamento">Campamento</option>
+          <option value="transito_vuelta">En Tránsito (vuelta)</option>
+          <option value="base_nielsen_ret">Base Nielsen (regreso)</option>
+          <option value="disposicion">Disposición Final</option>
+        </select>
+        <select class="ctrl" id="filterTipo" onchange="renderCards()">
+          <option value="">Todos los tipos</option>
+          <option>Peligroso</option><option>Reciclable</option>
+          <option>Orgánico</option><option>Mezcla Org/Recic.</option>
+        </select>
+        <input type="date" class="ctrl" id="filterFechaDesde" onchange="renderCards()" title="Fecha desde" style="font-size:12px;color:var(--text2);">
+        <input type="date" class="ctrl" id="filterFechaHasta" onchange="renderCards()" title="Fecha hasta" style="font-size:12px;color:var(--text2);">
+        <button class="btn" onclick="limpiarFiltros()" title="Limpiar filtros">✕ Filtros</button>
+      </div>
+      <div class="cards-list" id="cardsList"></div>
+      <div class="empty-msg" id="emptyMsg" style="display:none">No se encontraron contenedores.</div>
+    </div>
+
+    <!-- ── MAPA ── -->
+    <div class="view" id="view-mapa">
+      <div class="map-container">
+        <div style="padding:20px;">
+          <svg width="100%" viewBox="0 0 680 340" style="display:block;">
+            <rect x="0" y="0" width="680" height="340" rx="8" fill="#0d1117"/>
+            <!-- Ruta de fondo -->
+            <path d="M100 270 Q210 230 340 240 Q470 250 580 200" fill="none" stroke="#1c2230" stroke-width="60"/>
+            <!-- Carretera -->
+            <path d="M100 270 Q210 230 340 240 Q470 250 580 200" fill="none" stroke="#222836" stroke-width="18" stroke-linecap="round"/>
+            <!-- Línea de ruta activa -->
+            <path d="M100 270 Q210 230 340 240 Q470 250 580 200" fill="none" stroke="#f0a300" stroke-width="2" stroke-linecap="round" stroke-dasharray="18 12" opacity="0.6"/>
+            <!-- Flecha de regreso (vuelta) -->
+            <path d="M580 210 Q470 260 340 250 Q210 240 100 280" fill="none" stroke="#bc8cff" stroke-width="2" stroke-linecap="round" stroke-dasharray="10 8" opacity="0.5"/>
+            <!-- Montañas decorativas -->
+            <polygon points="560,100 610,170 510,170" fill="#1c2230"/>
+            <polygon points="590,80 650,170 530,170" fill="#161b22"/>
+            <polygon points="80,120 140,200 20,200" fill="#1c2230"/>
+            <!-- Nodo: Base Nielsen (origen) -->
+            <g>
+              <circle cx="100" cy="270" r="22" fill="#1c2230" stroke="#58a6ff" stroke-width="2"/>
+              <text x="100" y="266" text-anchor="middle" font-size="16" fill="#58a6ff">🏭</text>
+              <text x="100" y="278" text-anchor="middle" font-size="9" fill="#58a6ff" font-family="IBM Plex Mono,monospace" font-weight="600">BASE</text>
+              <text x="100" y="302" text-anchor="middle" font-size="10" fill="#8b949e" font-family="IBM Plex Mono,monospace">Base Nielsen</text>
+              <text x="100" y="314" text-anchor="middle" font-size="10" fill="#8b949e" font-family="IBM Plex Mono,monospace">(origen/regreso)</text>
+            </g>
+            <!-- Nodo: Campamento -->
+            <g>
+              <circle cx="340" cy="240" r="22" fill="#1c2230" stroke="#f0a300" stroke-width="2"/>
+              <text x="340" y="236" text-anchor="middle" font-size="16" fill="#f0a300">⛏️</text>
+              <text x="340" y="248" text-anchor="middle" font-size="9" fill="#f0a300" font-family="IBM Plex Mono,monospace" font-weight="600">CAMP</text>
+              <text x="340" y="270" text-anchor="middle" font-size="10" fill="#8b949e" font-family="IBM Plex Mono,monospace">Campamento</text>
+            </g>
+            <!-- Nodo: Disposición Final -->
+            <g>
+              <circle cx="580" cy="200" r="22" fill="#1c2230" stroke="#3fb950" stroke-width="2"/>
+              <text x="580" y="196" text-anchor="middle" font-size="16" fill="#3fb950">♻️</text>
+              <text x="580" y="208" text-anchor="middle" font-size="9" fill="#3fb950" font-family="IBM Plex Mono,monospace" font-weight="600">DISP</text>
+              <text x="580" y="230" text-anchor="middle" font-size="10" fill="#8b949e" font-family="IBM Plex Mono,monospace">Disposición Final</text>
+            </g>
+            <!-- Distancias -->
+            <text x="210" y="222" text-anchor="middle" font-size="10" fill="#6e7681" font-family="IBM Plex Mono,monospace">→ ida</text>
+            <text x="464" y="212" text-anchor="middle" font-size="10" fill="#6e7681" font-family="IBM Plex Mono,monospace">→ ida</text>
+            <text x="210" y="255" text-anchor="middle" font-size="10" fill="#bc8cff" font-family="IBM Plex Mono,monospace" opacity="0.7">← vuelta</text>
+          </svg>
+        </div>
+        <div style="padding:14px 20px;border-top:1px solid var(--border);">
+          <div class="sec-lbl" style="margin-bottom:10px;">Contenedores en tránsito activo</div>
+          <div id="transitPanel"></div>
+        </div>
+        <div class="map-legend">
+          <div class="map-leg-item"><div class="map-leg-dot" style="background:var(--blue)"></div>Base Nielsen</div>
+          <div class="map-leg-item"><div class="map-leg-dot" style="background:var(--amber)"></div>Campamento</div>
+          <div class="map-leg-item"><div class="map-leg-dot" style="background:var(--green)"></div>Disposición Final</div>
+          <div class="map-leg-item"><div class="map-leg-dot" style="background:var(--purple)"></div>En Tránsito (ida/vuelta)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── HISTORIAL ── -->
+    <div class="view" id="view-historial">
+      <div class="controls">
+        <div class="search-wrap">
+          <span class="si">🔍</span>
+          <input type="text" id="histSearch" placeholder="Buscar en historial..." oninput="renderHistory()">
+        </div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;">
+        <table class="history-table">
+          <thead><tr>
+            <th>Contenedor</th><th>Acción</th><th>Fase Anterior</th>
+            <th>Fase Nueva</th><th>Usuario</th><th>Fecha/Hora</th>
+          </tr></thead>
+          <tbody id="histBody"></tbody>
+        </table>
+        <div class="empty-msg" id="histEmpty" style="display:none">Sin registros de historial.</div>
+      </div>
+    </div>
+
+    <!-- ── ALERTAS ── -->
+    <div class="view" id="view-alertas">
+      <div class="alert-list" id="alertList"></div>
+      <div class="empty-msg" id="alertEmpty" style="display:none">✅ Sin alertas activas.</div>
+    </div>
+
+    <!-- ── CANTIDAD Y TIPO DE CONTENEDORES ── -->
+    <div class="view" id="view-tipos">
+      <div id="tiposContent"></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ── MODAL NUEVO CONTENEDOR ── -->
+<div class="overlay" id="modalOverlay" onclick="overlayClick(event,'modalOverlay')">
+  <div class="modal">
+    <div class="mh">
+      <span class="mh-title">Registrar Nuevo Contenedor</span>
+      <button class="mc" onclick="closeModal('modalOverlay')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fr">
+        <div class="fg"><label class="fl">ID Contenedor</label><input class="fi" id="f-id" placeholder="CTR-2025-00X"/></div>
+        <div class="fg"><label class="fl">Tipo de Residuo</label>
+          <select class="fi" id="f-tipo"><option>Peligroso</option><option>Reciclable</option><option>Orgánico</option><option>Mezcla Org/Recic.</option></select>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label class="fl">Cantidad (m³)</label><input class="fi" id="f-m3" type="number" min="0.1" step="0.1" placeholder="4.5"/></div>
+        <div class="fg"><label class="fl">Fase Actual</label>
+          <select class="fi" id="f-fase"><option value="base_nielsen">Base Nielsen</option><option value="transito_ida">En Tránsito (ida)</option><option value="campamento">Campamento</option><option value="transito_vuelta">En Tránsito (vuelta)</option><option value="base_nielsen_ret">Base Nielsen (regreso)</option><option value="disposicion">Disposición Final</option></select>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Descripción del Residuo</label><input class="fi" id="f-desc" placeholder="ej. Aceite hidráulico usado"/></div>
+      <div class="fr">
+        <div class="fg"><label class="fl">Empresa Generadora</label><input class="fi" id="f-empresa-gen" placeholder="ej. Minera Los Andes S.A."/></div>
+        <div class="fg"><label class="fl">Empresa Transportista</label><input class="fi" id="f-empresa-tra" placeholder="ej. Trans Residuos Ltda."/></div>
+      </div>
+      <div class="fg"><label class="fl">Conductor</label><input class="fi" id="f-conductor" placeholder="Nombre completo"/></div>
+      <div class="fr">
+        <div class="fg"><label class="fl">Patente del Camión</label><input class="fi" id="f-camion" placeholder="ej. ABCD-12"/></div>
+        <div class="fg"><label class="fl">Tara del Camión (kg)</label><input class="fi" id="f-tara-camion" type="number" min="0" step="0.1" placeholder="ej. 8500"/></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label class="fl">N° Orden de Transporte</label><input class="fi" id="f-orden" placeholder="ej. OT-2025-0046"/></div>
+        <div class="fg"><label class="fl">N° Manifiesto</label><input class="fi" id="f-manifiesto" placeholder="ej. MAN-2025-0024"/></div>
+      </div>
+      <div class="fg"><label class="fl">Registro Camión N°</label><input class="fi" id="f-reg-camion" placeholder="ej. CAM-0100"/></div>
+
+      <!-- SEMIREMOLQUE -->
+      <div class="fg">
+        <label class="fl">Semiremolque</label>
+        <select class="fi" id="f-semirremolque">
+          <option value="">— Sin semiremolque —</option>
+          <option value="Semi 1">Semi 1</option>
+          <option value="Semi 2">Semi 2</option>
+          <option value="Semi 3">Semi 3</option>
+          <option value="Semi 4">Semi 4</option>
+        </select>
+      </div>
+
+      <!-- CONTENEDORES INDIVIDUALES -->
+      <div class="fg">
+        <label class="fl">Cantidad de Contenedores</label>
+        <select class="fi" id="f-cant-cont" onchange="actualizarContenedores()">
+          <option value="1">1 contenedor</option>
+          <option value="2">2 contenedores</option>
+          <option value="3">3 contenedores</option>
+          <option value="4">4 contenedores</option>
+        </select>
+      </div>
+
+      <div id="contenedores-registros">
+        <!-- Contenedor 1 (siempre visible) -->
+        <div class="cont-registro-bloque" id="cont-bloque-1" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:10px;">
+          <div class="sec-lbl" style="margin-bottom:10px;color:var(--amber2);">📦 Contenedor 1</div>
+          <div class="fr">
+            <div class="fg"><label class="fl">Registro N°</label><input class="fi" id="f-reg-cont-1" placeholder="ej. CONT-0120"/></div>
+            <div class="fg"><label class="fl">% Llenado</label><input class="fi" id="f-pct-1" type="number" min="0" max="100" step="1" placeholder="75"/></div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label class="fl">Peso (kg)</label><input class="fi" id="f-peso-1" type="number" min="0" step="0.1" placeholder="ej. 320"/></div>
+            <div class="fg"><label class="fl">Tara (kg)</label><input class="fi" id="f-tara-1" type="number" min="0" step="0.1" placeholder="ej. 8500"/></div>
+          </div>
+        </div>
+        <!-- Contenedor 2 -->
+        <div class="cont-registro-bloque" id="cont-bloque-2" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:10px;">
+          <div class="sec-lbl" style="margin-bottom:10px;color:var(--amber2);">📦 Contenedor 2</div>
+          <div class="fr">
+            <div class="fg"><label class="fl">Registro N°</label><input class="fi" id="f-reg-cont-2" placeholder="ej. CONT-0121"/></div>
+            <div class="fg"><label class="fl">% Llenado</label><input class="fi" id="f-pct-2" type="number" min="0" max="100" step="1" placeholder="75"/></div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label class="fl">Peso (kg)</label><input class="fi" id="f-peso-2" type="number" min="0" step="0.1" placeholder="ej. 320"/></div>
+            <div class="fg"><label class="fl">Tara (kg)</label><input class="fi" id="f-tara-2" type="number" min="0" step="0.1" placeholder="ej. 8500"/></div>
+          </div>
+        </div>
+        <!-- Contenedor 3 -->
+        <div class="cont-registro-bloque" id="cont-bloque-3" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:10px;">
+          <div class="sec-lbl" style="margin-bottom:10px;color:var(--amber2);">📦 Contenedor 3</div>
+          <div class="fr">
+            <div class="fg"><label class="fl">Registro N°</label><input class="fi" id="f-reg-cont-3" placeholder="ej. CONT-0122"/></div>
+            <div class="fg"><label class="fl">% Llenado</label><input class="fi" id="f-pct-3" type="number" min="0" max="100" step="1" placeholder="75"/></div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label class="fl">Peso (kg)</label><input class="fi" id="f-peso-3" type="number" min="0" step="0.1" placeholder="ej. 320"/></div>
+            <div class="fg"><label class="fl">Tara (kg)</label><input class="fi" id="f-tara-3" type="number" min="0" step="0.1" placeholder="ej. 8500"/></div>
+          </div>
+        </div>
+        <!-- Contenedor 4 -->
+        <div class="cont-registro-bloque" id="cont-bloque-4" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:10px;">
+          <div class="sec-lbl" style="margin-bottom:10px;color:var(--amber2);">📦 Contenedor 4</div>
+          <div class="fr">
+            <div class="fg"><label class="fl">Registro N°</label><input class="fi" id="f-reg-cont-4" placeholder="ej. CONT-0123"/></div>
+            <div class="fg"><label class="fl">% Llenado</label><input class="fi" id="f-pct-4" type="number" min="0" max="100" step="1" placeholder="75"/></div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label class="fl">Peso (kg)</label><input class="fi" id="f-peso-4" type="number" min="0" step="0.1" placeholder="ej. 320"/></div>
+            <div class="fg"><label class="fl">Tara (kg)</label><input class="fi" id="f-tara-4" type="number" min="0" step="0.1" placeholder="ej. 8500"/></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fr">
+        <div class="fg"><label class="fl">Fecha de Salida</label><input class="fi" id="f-salida" type="date"/></div>
+        <div class="fg"><label class="fl">Fecha de Llegada</label><input class="fi" id="f-llegada" type="date"/></div>
+      </div>
+      <div class="fg"><label class="fl">Fecha Límite de Disposición Final</label><input class="fi" id="f-fecha-limite" type="date"/></div>
+      <div class="fr">
+        <div class="fg"><label class="fl">Kilometraje Salida</label><input class="fi" id="f-km-salida" type="number" min="0" step="1" placeholder="ej. 125000"/></div>
+        <div class="fg"><label class="fl">Kilometraje Llegada</label><input class="fi" id="f-km-llegada" type="number" min="0" step="1" placeholder="ej. 125850"/></div>
+      </div>
+      <div class="fg">
+        <label class="fl">Foto del Contenedor</label>
+        <div id="foto-preview-wrap" style="margin-top:4px;">
+          <label style="display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px dashed var(--border2);border-radius:var(--r);padding:10px 14px;cursor:pointer;transition:border-color .2s;" onmouseover="this.style.borderColor='var(--amber)'" onmouseout="this.style.borderColor='var(--border2)'">
+            <span style="font-size:20px;">📷</span>
+            <span style="font-size:12px;color:var(--text2);font-family:IBM Plex Mono,monospace;">Adjuntar foto (JPG, PNG — máx. 2MB)</span>
+            <input type="file" id="f-foto" accept="image/*" style="display:none;" onchange="previewFoto(this)"/>
+          </label>
+          <div id="foto-preview" style="display:none;margin-top:8px;position:relative;">
+            <img id="foto-img" src="" style="max-width:100%;max-height:140px;border-radius:var(--r);border:1px solid var(--border);object-fit:cover;"/>
+            <button onclick="clearFoto()" style="position:absolute;top:4px;right:4px;background:var(--red);border:none;color:#fff;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:1;">✕</button>
+          </div>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Observaciones</label><textarea class="fi" id="f-obs" rows="2" placeholder="Notas adicionales sobre el traslado..." style="resize:vertical;min-height:60px;"></textarea></div>
+    </div>
+    <div class="mf">
+      <button class="btn" onclick="closeModal('modalOverlay')">Cancelar</button>
+      <button class="btn btn-primary" id="btnRegistrar" onclick="submitForm()">💾 Registrar en Sheets</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL CONFIGURAR URL ── -->
+<div class="overlay" id="urlModal" onclick="overlayClick(event,'urlModal')">
+  <div class="modal" style="max-width:500px;">
+    <div class="mh">
+      <span class="mh-title">⚙️ Configurar URL de Web App</span>
+      <button class="mc" onclick="closeModal('urlModal')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg">
+        <label class="fl">URL de Google Apps Script Web App</label>
+        <input class="fi" id="sheetsUrl" placeholder="https://script.google.com/macros/s/.../exec"/>
+        <div class="url-hint">Pegá la URL de tu implementación como "Aplicación web" de Apps Script.</div>
+      </div>
+      <div class="url-steps">
+        <span>Cómo obtener la URL:</span><br>
+        1. Abrí el archivo Google Sheets<br>
+        2. Extensiones → Apps Script<br>
+        3. Pegá el código AppScript_ResTrack.gs<br>
+        4. Implementar → Nueva implementación<br>
+        5. Tipo: <span>Aplicación web</span><br>
+        6. Ejecutar como: <span>Yo (tu cuenta)</span><br>
+        7. Acceso: <span>Cualquier usuario</span> (o solo vos)<br>
+        8. Copiá la URL y pegala arriba
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn" onclick="closeModal('urlModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveUrl()">Guardar URL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  CONFIGURACIÓN — URL del Web App de Apps Script
+//  Guardada en localStorage para persistir entre sesiones
+// ══════════════════════════════════════════════════════════
+// URL del Web App — usa la hardcodeada como predeterminada si el usuario no configuró otra
+let SHEETS_URL = localStorage.getItem('restrack_sheets_url') || 'https://script.google.com/macros/s/AKfycbyn4sT69xwJxX-kyd_Ten9nKKj56PUdZfXu1NrCojSdKwEcKE1Md4NOZ9YpRvnG1I98HA/exec';
+
+// ══════════════════════════════════════
+//  CONSTANTES
+// ══════════════════════════════════════
+// Nuevo flujo secuencial:
+// base_nielsen → transito_ida → campamento → transito_vuelta → base_nielsen_ret → disposicion
+const PHASES    = ['base_nielsen','transito_ida','campamento','transito_vuelta','base_nielsen_ret','disposicion'];
+const PH_LABEL  = {
+  base_nielsen:     'Base Nielsen',
+  transito_ida:     'En Tránsito (ida)',
+  campamento:       'Campamento',
+  transito_vuelta:  'En Tránsito (vuelta)',
+  base_nielsen_ret: 'Base Nielsen (regreso)',
+  disposicion:      'Disposición Final'
+};
+const PH_LABEL_GS = {
+  'Base Nielsen':             'base_nielsen',
+  'En Tránsito (ida)':        'transito_ida',
+  'Campamento':               'campamento',
+  'En Tránsito (vuelta)':     'transito_vuelta',
+  'Base Nielsen (regreso)':   'base_nielsen_ret',
+  'Disposición Final':        'disposicion',
+  // legado — compatibilidad con datos anteriores
+  'Campamento Minero':        'campamento',
+  'En Tránsito':              'transito_ida',
+  'Empresa Base':             'base_nielsen',
+};
+const PH_ICON   = {
+  base_nielsen:     '🏭',
+  transito_ida:     '🚛',
+  campamento:       '⛏️',
+  transito_vuelta:  '🚚',
+  base_nielsen_ret: '🏢',
+  disposicion:      '♻️'
+};
+const PH_CLASS  = {
+  base_nielsen:     'ph-empresa',
+  transito_ida:     'ph-transito',
+  campamento:       'ph-campamento',
+  transito_vuelta:  'ph-transito',
+  base_nielsen_ret: 'ph-empresa',
+  disposicion:      'ph-disposicion'
+};
+const TP_CLASS  = {'Peligroso':'tp-peligroso','Reciclable':'tp-reciclable','Orgánico':'tp-organico','Mezcla Org/Recic.':'tp-mezcla'};
+const ALERT_DIAS = 3;
+
+// ══════════════════════════════════════
+//  DATA (memoria local + sincronizado con Sheets)
+// ══════════════════════════════════════
+let containers   = [];
+let globalLog    = [];
+let containerLog = {};
+let expanded     = new Set();
+let currentView  = 'dashboard';
+let sheetsOnline = false;
+
+// ══════════════════════════════════════
+//  GOOGLE SHEETS API
+//  Todas las llamadas pasan por la Web App de Apps Script
+// ══════════════════════════════════════
+
+/**
+ * Llama al Apps Script Web App.
+ * action: string que corresponde a la función en el GAS
+ * payload: objeto de datos (opcional)
+ */
+async function callSheets(action, payload = {}) {
+  // Usa la variable global SHEETS_URL (definida arriba, con fallback a la URL hardcodeada)
+  const params = new URLSearchParams({
+    action,
+    ...Object.fromEntries(
+      Object.entries(payload).map(([k, v]) => [
+        k,
+        typeof v === 'object' ? JSON.stringify(v) : v
+      ])
+    )
+  });
+
+  const res = await fetch(`${SHEETS_URL}?${params}`, { method: 'GET' });
+
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+
+  return json;
+}
+/**
+ * Guarda un nuevo contenedor en la hoja "Contenedores"
+ * Mapea campos del HTML → estructura del Apps Script
+ */
+async function guardarContenedorSheets(datos) {
+  return callSheets('guardarContenedor', { datos: JSON.stringify({
+    id        : datos.id,
+    tipo      : datos.tipo,
+    desc      : datos.desc,
+    m3        : datos.m3,
+    fase      : PH_LABEL[datos.fase],          // Apps Script espera texto, no key
+    empGen    : datos.empresaGeneradora,
+    empTra    : datos.empresaTransportista,
+    pct       : datos.pctLlenado,
+    orden     : datos.nOrdenTransporte,
+    manif     : datos.nManifiesto,
+    regCam    : datos.regCamion,
+    regCont   : datos.regContenedor,
+    cant      : datos.cantContenedores,
+    conductor : datos.conductor,
+    patente   : datos.camion,
+    fSalida   : datos.salida || '',
+    fLlegada  : datos.llegada || '',
+    semirremolque: datos.semirremolque || '',
+    pesoKg    : datos.pesoKg || 0,
+    tara      : datos.registrosContenedores?.[0]?.tara || 0,
+    taraCamion: datos.taraCamion || 0,
+    pesoBruto : datos.pesoBruto || 0,
+    fechaLimite: datos.fechaLimite || '',
+    kmSalida  : datos.kmSalida || 0,
+    kmLlegada : datos.kmLlegada || 0,
+    observaciones: datos.observaciones || '',
+    registrosContenedores: JSON.stringify(datos.registrosContenedores || []),
+  })});
+}
+
+/**
+ * Actualiza la fase de un contenedor en Sheets
+ */
+async function actualizarFaseSheets(id, faseLabelNew) {
+  return callSheets('actualizarFaseDesdeWeb', {
+    id,
+    nuevaFase: faseLabelNew
+  });
+}
+
+/**
+ * Lee todos los contenedores de la hoja "Contenedores"
+ * y los transforma al formato interno del HTML
+ */
+async function leerContenedoresSheets() {
+  const res = await callSheets('leerContenedores');
+  return (res.data || []).map(row => ({
+    id                 : row[0]  || '',
+    tipo               : row[1]  || 'Reciclable',
+    desc               : row[2]  || '',
+    m3                 : parseFloat(row[3]) || 0,
+    fase               : PH_LABEL_GS[row[4]] || 'campamento',
+    empresaGeneradora  : row[5]  || '',
+    empresaTransportista: row[6] || '',
+    pctLlenado         : parseInt(row[7]) || 0,
+    nOrdenTransporte   : row[8]  || '',
+    nManifiesto        : row[9]  || '',
+    regCamion          : row[10] || '',
+    regContenedor      : row[11] || '',
+    cantContenedores   : parseInt(row[12]) || 1,
+    conductor          : row[13] || '',
+    camion             : row[14] || '',
+    salida             : row[15] || null,
+    llegada            : row[16] || null,
+    firma              : null,
+    semirremolque      : row[18] || '',  // columna 19
+  }));
+}
+
+/**
+ * Lee el historial de la hoja "Historial"
+ */
+async function leerHistorialSheets() {
+  const res = await callSheets('leerHistorial');
+  return (res.data || []).map(row => ({
+    cid    : row[0] || '',
+    action : row[1] || '',
+    from   : PH_LABEL_GS[row[2]] || null,
+    to     : PH_LABEL_GS[row[3]] || null,
+    user   : row[4] || '',
+    ts     : row[5] || '',
+  }));
+}
+
+// ══════════════════════════════════════
+//  SINCRONIZACIÓN
+// ══════════════════════════════════════
+async function reloadFromSheets() {
+  if (!SHEETS_URL) {
+    showToast('⚠️', 'Configurá la URL primero (⚙️)', 'loading');
+    document.getElementById('configBanner').style.display = 'flex';
+    return;
+  }
+  showLoading('Sincronizando con Google Sheets...');
+  try {
+    const [conts, hist] = await Promise.all([leerContenedoresSheets(), leerHistorialSheets()]);
+    containers = conts;
+    globalLog  = hist;
+    containerLog = {};
+    containers.forEach(c => { containerLog[c.id] = []; });
+    hist.forEach(h => {
+      if (h.cid && containerLog[h.cid]) {
+        containerLog[h.cid].push({ action: h.action, fase: h.to, ts: h.ts, user: h.user });
+      }
+    });
+    setOnline(true);
+    showToast('✅', `${containers.length} contenedores cargados desde Sheets`, 'success');
+    refreshAll();
+  } catch (err) {
+    setOnline(false);
+    showToast('❌', `Error: ${err.message}`, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function setOnline(v) {
+  sheetsOnline = v;
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  const badge = document.getElementById('sheetsBadge');
+  if (v) {
+    dot.classList.remove('dot-offline');
+    text.textContent = 'Sheets conectado';
+    badge.style.display = 'inline-flex';
+  } else {
+    dot.classList.add('dot-offline');
+    text.textContent = 'Sin conexión';
+    badge.style.display = 'none';
+  }
+}
+
+function refreshAll() {
+  if (currentView === 'dashboard')    renderDashboard();
+  if (currentView === 'contenedores') renderCards();
+  if (currentView === 'historial')    renderHistory();
+  if (currentView === 'alertas')      renderAlertas();
+  if (currentView === 'mapa')         renderMapa();
+  if (currentView === 'tipos')        renderTipos();
+  renderAlertas(); // siempre actualizar badge
+}
+
+// ══════════════════════════════════════
+//  CONFIG URL
+// ══════════════════════════════════════
+function openUrlConfig() {
+  document.getElementById('sheetsUrl').value = SHEETS_URL;
+  document.getElementById('urlModal').classList.add('open');
+}
+function saveUrl() {
+  const url = document.getElementById('sheetsUrl').value.trim();
+  if (url && !url.startsWith('https://script.google.com')) {
+    showToast('⚠️', 'La URL debe ser de script.google.com', 'error');
+    return;
+  }
+  SHEETS_URL = url;
+  localStorage.setItem('restrack_sheets_url', url);
+  closeModal('urlModal');
+  if (url) {
+    document.getElementById('configBanner').style.display = 'none';
+    showToast('✅', 'URL guardada. Sincronizando...', 'success');
+    reloadFromSheets();
+  }
+}
+
+// ══════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════
+const pageTitles = {dashboard:'Dashboard',contenedores:'Contenedores',mapa:'Mapa de Ruta',historial:'Historial Global',alertas:'Alertas',tipos:'Cantidad y Tipo de Contenedores'};
+function showView(v) {
+  currentView = v;
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if (el.getAttribute('onclick') && el.getAttribute('onclick').includes("'"+v+"'")) el.classList.add('active');
+  });
+  document.getElementById('pageTitle').textContent = pageTitles[v] || v;
+  if (v==='dashboard')    renderDashboard();
+  if (v==='contenedores') renderCards();
+  if (v==='historial')    renderHistory();
+  if (v==='alertas')      renderAlertas();
+  if (v==='mapa')         renderMapa();
+  if (v==='tipos')        renderTipos();
+}
+
+// ══════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════
+function renderDashboard() {
+  const totalViajes = containers.length;
+  const totalContenedoresMovilizados = containers.reduce((s,c)=>s+(parseInt(c.cantContenedores)||1),0);
+  const totalM3 = containers.reduce((s,c)=>s+c.m3,0);
+  const enTransito = containers.filter(c=>c.fase==='transito_ida'||c.fase==='transito_vuelta').length;
+  const completados = containers.filter(c=>c.fase==='disposicion').length;
+  const alertas = getAlertas().length;
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card amber"><div class="stat-icon">🚚</div><div class="stat-lbl">Total de Viajes</div><div class="stat-val">${totalViajes}</div><div class="stat-sub">viajes registrados</div></div>
+    <div class="stat-card orange" style="--before-bg:var(--orange);"><div class="stat-icon">📦</div><div class="stat-lbl">Contenedores Movilizados</div><div class="stat-val" style="color:var(--orange);">${totalContenedoresMovilizados}</div><div class="stat-sub">unidades totales</div></div>
+    <div class="stat-card blue"><div class="stat-icon">⚖️</div><div class="stat-lbl">Volumen Total</div><div class="stat-val">${totalM3.toFixed(1)}</div><div class="stat-sub">m³ en gestión</div></div>
+    <div class="stat-card purple"><div class="stat-icon">🚛</div><div class="stat-lbl">En Tránsito</div><div class="stat-val">${enTransito}</div><div class="stat-sub">moviéndose ahora</div></div>
+    <div class="stat-card green"><div class="stat-icon">♻️</div><div class="stat-lbl">Completados</div><div class="stat-val">${completados}</div><div class="stat-sub">disposición final</div></div>
+    <div class="stat-card red"><div class="stat-icon">🔔</div><div class="stat-lbl">Alertas Activas</div><div class="stat-val" style="color:var(--red)">${alertas}</div><div class="stat-sub">requieren atención</div></div>
+  `;
+  renderBarChart('typeChart', getTipoCount());
+  renderPhaseBar('phaseChart');
+  const recent = [...globalLog].reverse().slice(0,8);
+  document.getElementById('recentMoves').innerHTML = recent.length ? recent.map(r=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:16px;">${r.to ? PH_ICON[r.to] : '📋'}</span>
+      <div style="flex:1;">
+        <span style="font-size:12px;font-family:IBM Plex Mono,monospace;color:var(--text);font-weight:500;">${r.cid}</span>
+        <span style="font-size:12px;color:var(--text2);margin-left:8px;">${r.action}</span>
+        ${r.from ? `<span style="font-size:11px;color:var(--text3);margin-left:6px;">${PH_LABEL[r.from]||r.from} → ${PH_LABEL[r.to]||r.to}</span>` : ''}
+      </div>
+      <span style="font-size:10px;font-family:IBM Plex Mono,monospace;color:var(--text3);white-space:nowrap;">${r.ts}</span>
+    </div>
+  `).join('') : '<div class="empty-msg">Sin movimientos recientes.</div>';
+}
+function getTipoCount(){const m={};containers.forEach(c=>{m[c.tipo]=(m[c.tipo]||0)+1;});return m;}
+function renderBarChart(elId,data){
+  const max=Math.max(...Object.values(data),1);
+  const colors={'Peligroso':'var(--red)','Reciclable':'var(--blue)','Orgánico':'var(--green)','Mezcla Org/Recic.':'var(--teal)'};
+  document.getElementById(elId).innerHTML=Object.entries(data).map(([k,v])=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="width:70px;font-size:11px;color:var(--text2);text-align:right;font-family:IBM Plex Mono,monospace;flex-shrink:0;">${k}</div>
+      <div style="flex:1;background:var(--bg3);border-radius:3px;height:20px;overflow:hidden;">
+        <div style="height:100%;width:${(v/max)*100}%;background:${colors[k]||'var(--amber)'};border-radius:3px;opacity:.8;transition:width .5s;"></div>
+      </div>
+      <div style="width:18px;font-size:11px;color:var(--text);font-family:IBM Plex Mono,monospace;font-weight:600;">${v}</div>
+    </div>`).join('');
+}
+function renderPhaseBar(elId){
+  const data={};PHASES.forEach(p=>{data[p]=containers.filter(c=>c.fase===p).length;});
+  const max=Math.max(...Object.values(data),1);
+  const colors={base_nielsen:'var(--blue)',transito_ida:'var(--purple)',campamento:'var(--amber)',transito_vuelta:'var(--purple)',base_nielsen_ret:'var(--blue)',disposicion:'var(--green)'};
+  document.getElementById(elId).innerHTML=PHASES.map(p=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="width:100px;font-size:11px;color:var(--text2);text-align:right;font-family:IBM Plex Mono,monospace;flex-shrink:0;">${PH_LABEL[p].split(' ')[0]}</div>
+      <div style="flex:1;background:var(--bg3);border-radius:3px;height:20px;overflow:hidden;">
+        <div style="height:100%;width:${(data[p]/max)*100}%;background:${colors[p]};border-radius:3px;opacity:.8;transition:width .5s;"></div>
+      </div>
+      <div style="width:18px;font-size:11px;color:var(--text);font-family:IBM Plex Mono,monospace;font-weight:600;">${data[p]}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════
+//  CANTIDAD Y TIPO DE CONTENEDORES
+// ══════════════════════════════════════
+function renderTipos() {
+  const TIPOS = [
+    { key: 'Peligroso',        icon: '☣️',  color: 'var(--red)',    colorDim: 'var(--red-dim)',    border: 'var(--red)',    cls: 'tp-peligroso' },
+    { key: 'Reciclable',       icon: '♻️',  color: 'var(--blue)',   colorDim: 'var(--blue-dim)',   border: 'var(--blue)',   cls: 'tp-reciclable' },
+    { key: 'Orgánico',         icon: '🌿',  color: 'var(--green)',  colorDim: 'var(--green-dim)',  border: 'var(--green)',  cls: 'tp-organico'   },
+    { key: 'Mezcla Org/Recic.',icon: '🔄',  color: 'var(--teal)',   colorDim: 'var(--teal-dim)',   border: 'var(--teal)',   cls: 'tp-mezcla'     },
+  ];
+
+  // ── Totales generales
+  const totalViajes       = containers.length;
+  const totalContenedores = containers.reduce((s,c) => s + (parseInt(c.cantContenedores)||1), 0);
+
+  // ── Métricas por tipo
+  const porTipo = TIPOS.map(t => {
+    const viajes = containers.filter(c => c.tipo === t.key);
+    const unidades = viajes.reduce((s,c) => s + (parseInt(c.cantContenedores)||1), 0);
+    const m3 = viajes.reduce((s,c) => s + (parseFloat(c.m3)||0), 0);
+    const fases = {};
+    PHASES.forEach(p => { fases[p] = viajes.filter(c => c.fase === p).length; });
+    // por fase: contenedores (unidades) no viajes
+    const faseUnidades = {};
+    PHASES.forEach(p => {
+      faseUnidades[p] = viajes.filter(c => c.fase === p).reduce((s,c) => s + (parseInt(c.cantContenedores)||1), 0);
+    });
+    return { ...t, viajes: viajes.length, unidades, m3, fases, faseUnidades };
+  });
+
+  const maxUnidades = Math.max(...porTipo.map(t => t.unidades), 1);
+
+  // ── Resumen de fases global por tipo (tabla cruzada)
+  const faseRows = PHASES.map(p => {
+    const cols = porTipo.map(t => t.faseUnidades[p]);
+    const rowTotal = cols.reduce((a,b) => a+b, 0);
+    return { fase: p, cols, rowTotal };
+  }).filter(r => r.rowTotal > 0);
+
+  // ── Render
+  const el = document.getElementById('tiposContent');
+  el.innerHTML = `
+
+    <!-- Tarjetas resumen por tipo -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;">
+      ${porTipo.map(t => `
+        <div style="background:var(--bg2);border:1px solid ${t.border};border-radius:var(--rl);padding:18px 20px;position:relative;overflow:hidden;">
+          <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${t.color};"></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <span style="font-size:26px;">${t.icon}</span>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);">${t.key}</div>
+              <div style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.06em;">tipo de residuo</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;">
+              <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:4px;">Viajes</div>
+              <div style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--text);">${t.viajes}</div>
+            </div>
+            <div style="background:${t.colorDim};border:1px solid ${t.border};border-radius:var(--r);padding:10px 12px;">
+              <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:4px;">Contenedores</div>
+              <div style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:${t.color};">${t.unidades}</div>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">Proporción del total</span>
+              <span style="font-size:10px;font-weight:600;color:${t.color};font-family:'IBM Plex Mono',monospace;">${totalContenedores > 0 ? Math.round((t.unidades/totalContenedores)*100) : 0}%</span>
+            </div>
+            <div style="background:var(--bg3);border-radius:3px;height:6px;overflow:hidden;">
+              <div style="height:100%;width:${totalContenedores > 0 ? (t.unidades/totalContenedores)*100 : 0}%;background:${t.color};border-radius:3px;transition:width .6s;"></div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text2);font-family:'IBM Plex Mono',monospace;">⚖️ ${t.m3.toFixed(1)} m³ gestionados</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Barra comparativa de unidades -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:20px;margin-bottom:20px;">
+      <div class="sec-lbl" style="margin-bottom:16px;">Comparativa de contenedores por tipo</div>
+      ${porTipo.map(t => `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="width:28px;font-size:18px;text-align:center;flex-shrink:0;">${t.icon}</div>
+          <div style="width:130px;font-size:11px;color:var(--text2);font-family:'IBM Plex Mono',monospace;flex-shrink:0;line-height:1.3;">${t.key}</div>
+          <div style="flex:1;background:var(--bg3);border-radius:4px;height:24px;overflow:hidden;position:relative;">
+            <div style="height:100%;width:${(t.unidades/maxUnidades)*100}%;background:${t.color};border-radius:4px;opacity:.85;transition:width .6s;display:flex;align-items:center;padding-left:8px;">
+              ${t.unidades > 0 ? `<span style="font-size:10px;font-family:'IBM Plex Mono',monospace;font-weight:600;color:#0d1117;white-space:nowrap;">${t.unidades} uds</span>` : ''}
+            </div>
+          </div>
+          <div style="width:60px;text-align:right;font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">${t.viajes} viaje${t.viajes!==1?'s':''}</div>
+        </div>
+      `).join('')}
+      <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">TOTAL</span>
+        <span style="font-size:14px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--amber);">${totalContenedores} contenedores · ${totalViajes} viajes</span>
+      </div>
+    </div>
+
+    <!-- Tabla cruzada: tipo × fase -->
+    ${faseRows.length > 0 ? `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:20px;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
+        <div class="sec-lbl" style="margin-bottom:0;">Distribución de contenedores por tipo y fase actual</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:var(--bg3);">
+              <th style="text-align:left;padding:10px 16px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-family:'IBM Plex Mono',monospace;font-weight:500;border-bottom:1px solid var(--border);min-width:160px;">Fase</th>
+              ${porTipo.map(t => `<th style="text-align:center;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:${t.color};font-family:'IBM Plex Mono',monospace;font-weight:600;border-bottom:1px solid var(--border);">${t.icon} ${t.key}</th>`).join('')}
+              <th style="text-align:center;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--amber);font-family:'IBM Plex Mono',monospace;font-weight:600;border-bottom:1px solid var(--border);">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${faseRows.map((r,ri) => `
+              <tr style="${ri%2===0?'background:var(--bg3);':''}">
+                <td style="padding:10px 16px;font-size:11px;color:var(--text2);font-family:'IBM Plex Mono',monospace;border-bottom:1px solid var(--border);">${PH_ICON[r.fase]} ${PH_LABEL[r.fase]}</td>
+                ${r.cols.map((v,ci) => `<td style="text-align:center;padding:10px 12px;font-size:13px;font-weight:${v>0?'600':'400'};color:${v>0?porTipo[ci].color:'var(--text3)'};font-family:'IBM Plex Mono',monospace;border-bottom:1px solid var(--border);">${v > 0 ? v : '—'}</td>`).join('')}
+                <td style="text-align:center;padding:10px 12px;font-size:13px;font-weight:700;color:var(--amber);font-family:'IBM Plex Mono',monospace;border-bottom:1px solid var(--border);">${r.rowTotal}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:var(--bg4,#222836);">
+              <td style="padding:10px 16px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-family:'IBM Plex Mono',monospace;font-weight:600;">TOTAL</td>
+              ${porTipo.map(t => `<td style="text-align:center;padding:10px 12px;font-size:13px;font-weight:700;color:${t.color};font-family:'IBM Plex Mono',monospace;">${t.unidades}</td>`).join('')}
+              <td style="text-align:center;padding:10px 12px;font-size:14px;font-weight:700;color:var(--amber);font-family:'IBM Plex Mono',monospace;">${totalContenedores}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Detalle de viajes por tipo -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+      ${porTipo.map(t => t.viajes > 0 ? `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--bg3);">
+            <span style="font-size:18px;">${t.icon}</span>
+            <span style="font-size:13px;font-weight:600;color:var(--text);">${t.key}</span>
+            <span style="margin-left:auto;font-size:11px;font-family:'IBM Plex Mono',monospace;color:${t.color};background:${t.colorDim};border:1px solid ${t.border};border-radius:20px;padding:2px 10px;">${t.unidades} contenedores</span>
+          </div>
+          ${containers.filter(c => c.tipo === t.key).map(c => `
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--border);">
+              <div style="width:6px;height:6px;border-radius:50%;background:${t.color};flex-shrink:0;"></div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text);font-weight:500;">${c.id}</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:1px;">🚛 ${c.camion} · 👷 ${c.conductor.split(' ').slice(0,2).join(' ')}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:${t.color};">${parseInt(c.cantContenedores)||1}</div>
+                <div style="font-size:9px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">uds</div>
+              </div>
+              <span style="font-size:10px;padding:2px 7px;border-radius:10px;font-family:'IBM Plex Mono',monospace;${PH_CLASS[c.fase]==='ph-transito'?'background:var(--purple-dim);color:var(--purple);':PH_CLASS[c.fase]==='ph-campamento'?'background:var(--amber-dim);color:var(--amber2);':PH_CLASS[c.fase]==='ph-disposicion'?'background:var(--green-dim);color:var(--green2);':'background:var(--blue-dim);color:var(--blue2);'}">${PH_ICON[c.fase]}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : '').join('')}
+    </div>
+
+    <!-- ── GRÁFICOS MENSUALES ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;" id="chartsGrid">
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:20px;">
+        <div class="sec-lbl" style="margin-bottom:16px;">📅 Viajes y contenedores por mes</div>
+        <div style="position:relative;height:240px;">
+          <canvas id="chartViajesMes"></canvas>
+        </div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:20px;">
+        <div class="sec-lbl" style="margin-bottom:16px;">📦 Contenedores por tipo y mes</div>
+        <div style="position:relative;height:240px;">
+          <canvas id="chartTiposMes"></canvas>
+        </div>
+      </div>
+    </div>
+
+    ${totalContenedores === 0 ? '<div class="empty-msg">No hay contenedores registrados aún.</div>' : ''}
+  `;
+  // Renderizar gráficos después de insertar el HTML
+  requestAnimationFrame(() => renderGraficosMensuales());
+}
+
+// ══════════════════════════════════════
+//  GRÁFICOS MENSUALES
+// ══════════════════════════════════════
+let _chartViajes = null;
+let _chartTipos  = null;
+
+function getMesesOrdenados() {
+  const meses = new Set();
+  containers.forEach(c => {
+    const fecha = c.salida || c.llegada || null;
+    if (fecha) {
+      let d = null;
+      if (/^\d{4}-\d{2}-\d{2}/.test(fecha)) { d = new Date(fecha); }
+      else if (/^\d{2}\/\d{2}\/\d{4}/.test(fecha)) {
+        const [dd,mm,yyyy] = fecha.split('/'); d = new Date(`${yyyy}-${mm}-${dd}`);
+      }
+      if (d && !isNaN(d)) meses.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    }
+  });
+  return [...meses].sort();
+}
+function getMesLabel(ym) {
+  const [y,m] = ym.split('-');
+  const n = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return `${n[parseInt(m)-1]} ${y}`;
+}
+function getContainerMes(c) {
+  const fecha = c.salida || c.llegada || null;
+  if (!fecha) return null;
+  let d = null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(fecha)) { d = new Date(fecha); }
+  else if (/^\d{2}\/\d{2}\/\d{4}/.test(fecha)) {
+    const [dd,mm,yyyy] = fecha.split('/'); d = new Date(`${yyyy}-${mm}-${dd}`);
+  }
+  if (!d || isNaN(d)) return null;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function renderGraficosMensuales() {
+  const meses = getMesesOrdenados();
+  const labels = meses.length ? meses.map(getMesLabel) : ['Sin datos'];
+
+  const viajesPorMes   = meses.map(m => containers.filter(c => getContainerMes(c) === m).length);
+  const contensPorMes  = meses.map(m =>
+    containers.filter(c => getContainerMes(c) === m)
+              .reduce((s,c) => s + (parseInt(c.cantContenedores)||1), 0));
+
+  const TIPOS_DEF = [
+    { key: 'Peligroso',         color: 'rgba(248,81,73,0.8)',   border: '#f85149' },
+    { key: 'Reciclable',        color: 'rgba(88,166,255,0.8)',  border: '#58a6ff' },
+    { key: 'Orgánico',          color: 'rgba(63,185,80,0.8)',   border: '#3fb950' },
+    { key: 'Mezcla Org/Recic.', color: 'rgba(46,168,168,0.8)', border: '#2ea8a8' },
+  ];
+  const tiposDatasets = TIPOS_DEF.map(t => ({
+    label: t.key,
+    data: meses.map(m =>
+      containers.filter(c => getContainerMes(c) === m && c.tipo === t.key)
+                .reduce((s,c) => s + (parseInt(c.cantContenedores)||1), 0)),
+    backgroundColor: t.color,
+    borderColor: t.border,
+    borderWidth: 1,
+    borderRadius: 4,
+  }));
+
+  const scaleBase = {
+    ticks: { color: '#6e7681', font: { family: "'IBM Plex Mono',monospace", size: 10 } },
+    grid:  { color: '#21262d' }
+  };
+  const tooltipCfg = {
+    backgroundColor:'#161b22', borderColor:'#30363d', borderWidth:1,
+    titleColor:'#e6edf3', bodyColor:'#8b949e',
+    titleFont:{family:"'IBM Plex Mono',monospace"}, bodyFont:{family:"'IBM Plex Mono',monospace"}
+  };
+  const legendCfg = {
+    labels: { color:'#8b949e', font:{family:"'IBM Plex Mono',monospace",size:11}, boxWidth:12, padding:14 }
+  };
+
+  // Gráfico 1: Viajes y Contenedores por mes (ambos en formato de barra)
+  const ctx1 = document.getElementById('chartViajesMes');
+  if (ctx1) {
+    if (_chartViajes) _chartViajes.destroy();
+    _chartViajes = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Viajes', data: viajesPorMes, type: 'bar',
+            backgroundColor: 'rgba(240,163,0,0.75)', borderColor: '#f0a300',
+            borderWidth:1, borderRadius:4, yAxisID:'y',
+          },
+          {
+            // CAMBIO: Se transformó de 'line' a 'bar' y se ajustaron los estilos
+            label: 'Contenedores', data: contensPorMes, type: 'bar', 
+            backgroundColor: 'rgba(188,140,255,0.75)', borderColor: '#bc8cff',
+            borderWidth:1, borderRadius:4, yAxisID:'y2',
+          }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: { legend: legendCfg, tooltip: tooltipCfg },
+        scales: {
+          x: scaleBase,
+          y: { ...scaleBase, beginAtZero:true, title:{ display:true, text:'Viajes', color:'#f0a300', font:{family:"'IBM Plex Mono',monospace",size:10} } },
+          y2: { ...scaleBase, position:'right', beginAtZero:true, grid:{ drawOnChartArea:false, color:'#21262d' },
+            title:{ display:true, text:'Contenedores', color:'#bc8cff', font:{family:"'IBM Plex Mono',monospace",size:10} } }
+        }
+      }
+    });
+  }
+
+  // Gráfico 2: Contenedores por tipo por mes (barras a la par)
+  const ctx2 = document.getElementById('chartTiposMes');
+  if (ctx2) {
+    if (_chartTipos) _chartTipos.destroy();
+    _chartTipos = new Chart(ctx2, {
+      type: 'bar',
+      data: { labels, datasets: tiposDatasets },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: { legend: legendCfg, tooltip: tooltipCfg },
+        scales: {
+          // CAMBIO: Se eliminó "stacked: true" en el eje X
+          x: { ...scaleBase }, 
+          // CAMBIO: Se eliminó "stacked: true" en el eje Y
+          y: { ...scaleBase, beginAtZero:true,
+            title:{ display:true, text:'Contenedores', color:'#8b949e', font:{family:"'IBM Plex Mono',monospace",size:10} } }
+        }
+      }
+    });
+  }
+}
+
+// ══════════════════════════════════════
+//  CONTENEDORES
+// ══════════════════════════════════════
+function renderCards(){
+  const q=(document.getElementById('searchInput')||{value:''}).value.toLowerCase();
+  const ff=(document.getElementById('filterFase')||{value:''}).value;
+  const ft=(document.getElementById('filterTipo')||{value:''}).value;
+  const fd=(document.getElementById('filterFechaDesde')||{value:''}).value;
+  const fh=(document.getElementById('filterFechaHasta')||{value:''}).value;
+  let list=containers.filter(c=>{
+    const ms=!q||c.id.toLowerCase().includes(q)||c.conductor.toLowerCase().includes(q)||c.camion.toLowerCase().includes(q)||c.desc.toLowerCase().includes(q);
+    const dateStr=c.salida||'';
+    const afterDesde=!fd||dateStr>=fd;
+    const beforeHasta=!fh||dateStr<=fh;
+    return ms&&(!ff||c.fase===ff)&&(!ft||c.tipo===ft)&&afterDesde&&beforeHasta;
+  });
+  const el=document.getElementById('cardsList');
+  const em=document.getElementById('emptyMsg');
+  if(!list.length){el.innerHTML='';em.style.display='block';return;}
+  em.style.display='none';
+  el.innerHTML=list.map(c=>cardHTML(c)).join('');
+  list.forEach(c=>{if(expanded.has(c.id))initCanvas(c.id);});
+}
+function isAlert(c){
+  const enTransito = c.fase==='transito_ida' || c.fase==='transito_vuelta';
+  if(enTransito&&c.salida&&(new Date()-new Date(c.salida))/86400000>ALERT_DIAS) return true;
+  if(c.fechaLimite && c.fase!=='disposicion' && (new Date(c.fechaLimite)-new Date())/86400000<=3) return true;
+  return false;
+}
+function cardHTML(c){
+  const exp=expanded.has(c.id);
+  const pIdx=PHASES.indexOf(c.fase);
+  const pct=(pIdx/(PHASES.length-1))*100;
+  const alrt=isAlert(c);
+  const tlSteps=PHASES.map((p,i)=>{
+    let st=i<pIdx?'done':i===pIdx?'active':'';
+    let dt=p==='base_nielsen'?c.salida:p==='disposicion'?c.llegada:'';
+    return `<div class="tl-step ${st}"><div class="tl-node">${PH_ICON[p]}</div><div class="tl-lbl">${PH_LABEL[p]}</div>${dt?`<div class="tl-date">${dt}</div>`:''}</div>`;
+  }).join('');
+  const phaseBtns=PHASES.map(p=>`<button class="p-btn ${c.fase===p?'current':''}" onclick="setPhase(event,'${c.id}','${p}')">${PH_ICON[p]} ${PH_LABEL[p]}</button>`).join('');
+  const hist=(containerLog[c.id]||[]);
+  const histHTML=hist.length?hist.map((h,i)=>`
+    <div class="hist-item"><div class="hist-dot ${i>0?'old':''}"></div>
+    <div class="hist-content"><div class="hist-action">${h.action}</div><div class="hist-meta">${h.ts} · ${h.user}</div></div></div>`).join('')
+    :'<div style="font-size:12px;color:var(--text3);padding:8px 0;">Sin historial registrado.</div>';
+  const firmaSection=c.firma
+    ?`<div class="firma-saved">✅ Firma digital registrada <img src="${c.firma}" class="firma-img" style="height:40px;margin-left:8px;"/></div>`
+    :`<div class="firma-box">
+        <div style="font-size:11px;color:var(--text3);font-family:IBM Plex Mono,monospace;align-self:flex-start;">Firma del conductor</div>
+        <canvas class="firma-canvas" id="canvas-${c.id}" width="360" height="90"></canvas>
+        <div class="firma-actions">
+          <button class="firma-clear" onclick="clearCanvas('${c.id}')">Limpiar</button>
+          <button class="firma-done" onclick="saveFirma('${c.id}')">✔ Confirmar firma</button>
+        </div></div>`;
+  return `<div class="c-card ${exp?'expanded':''} ${alrt?'alert-card':''}" id="card-${c.id}">
+    <div class="card-head" onclick="toggleCard('${c.id}')">
+      <div class="cid-box"><span>${c.id.replace('CTR-','')}</span></div>
+      <div>
+        <div class="card-top-row">
+          <span class="cid-text">${c.id}</span>
+          <span class="r-badge ${TP_CLASS[c.tipo]||''}">${c.tipo}</span>
+          ${alrt?'<span class="alert-icon">⚠️</span>':''}
+        </div>
+        <div class="card-meta">
+          <span class="cm">🚛 ${c.camion}</span>
+          <span class="cm">👷 ${c.conductor.split(' ').slice(0,2).join(' ')}</span>
+          <span class="cm">📦 ${c.m3} m³</span>
+          ${c.salida?`<span class="cm">📅 ${c.salida}</span>`:''}
+        </div>
+      </div>
+      <div class="card-right-col">
+        <span class="p-badge ${PH_CLASS[c.fase]}">${PH_ICON[c.fase]} ${PH_LABEL[c.fase]}</span>
+        <span class="chevron">▾</span>
+      </div>
+    </div>
+    <div class="card-body"><div class="card-body-inner">
+      <div class="tl-wrap">
+        <div class="sec-lbl">Trazabilidad del Trayecto</div>
+        <div class="timeline"><div class="tl-progress" style="width:${pct}%"></div>${tlSteps}</div>
+      </div>
+      <div class="sec-lbl" style="margin-top:18px;">Información del traslado</div>
+      <div class="d-grid">
+        <div class="d-item"><div class="d-key">Descripción</div><div class="d-val" style="font-size:11px;">${c.desc}</div></div>
+        <div class="d-item"><div class="d-key">Volumen</div><div class="d-val">${c.m3} m³</div></div>
+        <div class="d-item"><div class="d-key">Conductor</div><div class="d-val" style="font-size:11px;">${c.conductor}</div></div>
+        <div class="d-item"><div class="d-key">Camión / Patente</div><div class="d-val">${c.camion}</div></div>
+        <div class="d-item"><div class="d-key">Tara del Camión</div><div class="d-val">${c.taraCamion ? c.taraCamion+' kg' : '—'}</div></div>
+        <div class="d-item"><div class="d-key">Fecha Salida</div><div class="d-val">${c.salida||'Pendiente'}</div></div>
+        <div class="d-item"><div class="d-key">Fecha Llegada</div><div class="d-val">${c.llegada||'Pendiente'}</div></div>
+        <div class="d-item"><div class="d-key">Fecha Límite Disposición</div><div class="d-val" style="color:${c.fechaLimite && new Date(c.fechaLimite)<new Date()?'var(--red)':c.fechaLimite && (new Date(c.fechaLimite)-new Date())/86400000<=3?'var(--amber)':''}">${c.fechaLimite||('—')}${c.fechaLimite && new Date(c.fechaLimite)<new Date()?'  ⚠️ VENCIDA':'' }</div></div>
+        <div class="d-item"><div class="d-key">Peso Bruto</div><div class="d-val">${c.pesoBruto?c.pesoBruto+' kg':(c.taraCamion&&c.pesoKg?(c.taraCamion+c.pesoKg)+' kg (calc.)':'—')}</div></div>
+        <div class="d-item"><div class="d-key">Km Salida / Llegada</div><div class="d-val">${c.kmSalida||'—'} / ${c.kmLlegada||'—'}${c.kmSalida&&c.kmLlegada?' ('+(c.kmLlegada-c.kmSalida)+' km)':'' }</div></div>
+      </div>
+      <div class="sec-lbl" style="margin-top:16px;">Datos operacionales y legales</div>
+      <div class="d-grid">
+        <div class="d-item"><div class="d-key">Empresa Generadora</div><div class="d-val" style="font-size:11px;">${c.empresaGeneradora||'—'}</div></div>
+        <div class="d-item"><div class="d-key">Empresa Transportista</div><div class="d-val" style="font-size:11px;">${c.empresaTransportista||'—'}</div></div>
+        <div class="d-item"><div class="d-key">Semiremolque</div><div class="d-val">${c.semirremolque||'—'}</div></div>
+        <div class="d-item"><div class="d-key">N° Orden de Transporte</div><div class="d-val">${c.nOrdenTransporte||'—'}</div></div>
+        <div class="d-item"><div class="d-key">N° Manifiesto</div><div class="d-val">${c.nManifiesto||'—'}</div></div>
+        <div class="d-item"><div class="d-key">Registro Camión N°</div><div class="d-val">${c.regCamion||'—'}</div></div>
+        <div class="d-item"><div class="d-key">Cant. Contenedores</div><div class="d-val">${c.cantContenedores||1}</div></div>
+      </div>
+      ${(c.registrosContenedores&&c.registrosContenedores.length>0)?`
+      <div class="sec-lbl" style="margin-top:16px;">Registros por Contenedor</div>
+      <div class="d-grid">
+        ${c.registrosContenedores.map((r,i)=>`
+          <div class="d-item" style="border-left:2px solid var(--amber);padding-left:11px;">
+            <div class="d-key">📦 Contenedor ${i+1}</div>
+            <div class="d-val" style="font-size:11px;">${r.registro||'—'}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+              <div style="flex:1;background:var(--bg2);border-radius:3px;height:6px;overflow:hidden;">
+                <div style="height:100%;width:${r.pct||0}%;background:${(r.pct||0)>=90?'var(--red)':(r.pct||0)>=60?'var(--amber)':'var(--green)'};border-radius:3px;"></div>
+              </div>
+              <span style="font-size:10px;font-family:IBM Plex Mono,monospace;color:var(--text2);">${r.pct||0}%</span>
+            </div>
+            ${r.pesoKg ? `<div style="font-size:10px;font-family:IBM Plex Mono,monospace;color:var(--text3);margin-top:4px;">⚖️ ${r.pesoKg} kg</div>` : ''}
+            ${r.tara ? `<div style="font-size:10px;font-family:IBM Plex Mono,monospace;color:var(--text3);margin-top:2px;">🚛 Tara: ${r.tara} kg</div>` : ''}
+          </div>`).join('')}
+      </div>`:
+      `<div class="d-grid" style="margin-top:16px;">
+        <div class="d-item"><div class="d-key">% Llenado</div><div class="d-val">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="flex:1;background:var(--bg3);border-radius:3px;height:8px;overflow:hidden;">
+              <div style="height:100%;width:${c.pctLlenado||0}%;background:${(c.pctLlenado||0)>=90?'var(--red)':(c.pctLlenado||0)>=60?'var(--amber)':'var(--green)'};border-radius:3px;"></div>
+            </div><span>${c.pctLlenado||0}%</span></div></div></div>
+        <div class="d-item"><div class="d-key">Registro Contenedor N°</div><div class="d-val">${c.regContenedor||'—'}</div></div>
+      </div>`}
+      ${c.observaciones?`<div class="sec-lbl" style="margin-top:16px;">Observaciones</div><div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 13px;font-size:12px;color:var(--text2);line-height:1.6;">${c.observaciones}</div>`:''}
+      ${c.foto?`<div class="sec-lbl" style="margin-top:16px;">Foto del Contenedor</div><div style="margin-bottom:8px;"><img src="${c.foto}" style="max-width:100%;max-height:200px;border-radius:var(--r);border:1px solid var(--border);object-fit:cover;"/></div>`:''}
+      <div class="sec-lbl" style="margin-top:16px;">Actualizar fase</div>
+      <div class="phase-btns">${phaseBtns}</div>
+      <div class="sec-lbl" style="margin-top:16px;">Historial de movimientos</div>
+      <div class="hist-list">${histHTML}</div>
+      <div class="firma-area">
+        <div class="sec-lbl" style="margin-top:14px;margin-bottom:10px;">Firma digital del conductor</div>
+        ${firmaSection}
+      </div>
+    </div></div>
+  </div>`;
+}
+function toggleCard(id){expanded.has(id)?expanded.delete(id):expanded.add(id);renderCards();if(expanded.has(id))setTimeout(()=>initCanvas(id),50);}
+
+async function setPhase(e, id, newFase) {
+  e.stopPropagation();
+  const idx=containers.findIndex(c=>c.id===id);
+  if(idx<0)return;
+  const old=containers[idx].fase;
+  if(old===newFase)return;
+  // Actualizar localmente primero (UX optimista)
+  containers[idx].fase=newFase;
+  const now=new Date();
+  const ts=now.toISOString().slice(0,16).replace('T',' ');
+  const entry={action:'Fase actualizada',fase:newFase,ts,user:'Operador'};
+  if(!containerLog[id])containerLog[id]=[];
+  containerLog[id].unshift(entry);
+  globalLog.push({cid:id,action:'Fase actualizada',from:old,to:newFase,user:'Operador',ts});
+  renderCards();
+  renderDashboardIfActive();
+  // Sincronizar con Sheets
+  if(SHEETS_URL){
+    try{
+      await actualizarFaseSheets(id, PH_LABEL[newFase]);
+      showToast('✅',`${id} → ${PH_LABEL[newFase]} guardado en Sheets`,'success');
+    } catch(err){
+      showToast('⚠️',`Cambio local OK pero error en Sheets: ${err.message}`,'error');
+    }
+  }
+}
+function renderDashboardIfActive(){if(currentView==='dashboard')renderDashboard();}
+
+// ══════════════════════════════════════
+//  FIRMA
+// ══════════════════════════════════════
+const canvasState={};
+function initCanvas(id){
+  const cv=document.getElementById('canvas-'+id);
+  if(!cv||canvasState[id])return;
+  const ctx=cv.getContext('2d');
+  ctx.strokeStyle='#333';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';
+  let drawing=false,lx=0,ly=0;
+  function pos(e){const r=cv.getBoundingClientRect();const src=e.touches?e.touches[0]:e;return{x:(src.clientX-r.left)*(cv.width/r.width),y:(src.clientY-r.top)*(cv.height/r.height)};}
+  cv.addEventListener('mousedown',e=>{drawing=true;const p=pos(e);lx=p.x;ly=p.y;});
+  cv.addEventListener('mousemove',e=>{if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p.x,p.y);ctx.stroke();lx=p.x;ly=p.y;});
+  cv.addEventListener('mouseup',()=>drawing=false);
+  cv.addEventListener('mouseleave',()=>drawing=false);
+  cv.addEventListener('touchstart',e=>{e.preventDefault();drawing=true;const p=pos(e);lx=p.x;ly=p.y;},{passive:false});
+  cv.addEventListener('touchmove',e=>{e.preventDefault();if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p.x,p.y);ctx.stroke();lx=p.x;ly=p.y;},{passive:false});
+  cv.addEventListener('touchend',()=>drawing=false);
+  canvasState[id]=ctx;
+}
+function clearCanvas(id){const cv=document.getElementById('canvas-'+id);if(!cv)return;const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);}
+function saveFirma(id){
+  const cv=document.getElementById('canvas-'+id);if(!cv)return;
+  const idx=containers.findIndex(c=>c.id===id);if(idx<0)return;
+  containers[idx].firma=cv.toDataURL();
+  const ts=new Date().toISOString().slice(0,16).replace('T',' ');
+  if(!containerLog[id])containerLog[id]=[];
+  containerLog[id].unshift({action:'Firma digital registrada',fase:containers[idx].fase,ts,user:containers[idx].conductor});
+  globalLog.push({cid:id,action:'Firma registrada',from:null,to:containers[idx].fase,user:containers[idx].conductor,ts});
+  delete canvasState[id];
+  renderCards();
+  showToast('✅','Firma registrada localmente','success');
+}
+
+// ══════════════════════════════════════
+//  ALERTAS
+// ══════════════════════════════════════
+function getAlertas(){
+  const alerts=[];
+  const now=new Date();
+  containers.forEach(c=>{
+    const enTransito = c.fase==='transito_ida' || c.fase==='transito_vuelta';
+    if(enTransito&&c.salida){
+      const dias=Math.floor((now-new Date(c.salida))/86400000);
+      if(dias>ALERT_DIAS)alerts.push({type:'danger',icon:'🚨',title:`${c.id} lleva ${dias} días en tránsito`,desc:`Conductor: ${c.conductor} | Camión: ${c.camion} | Salida: ${c.salida}`,ts:c.salida});
+    }
+    if(enTransito&&!c.conductor)alerts.push({type:'warn',icon:'⚠️',title:`${c.id} sin conductor asignado`,desc:'En tránsito sin conductor.',ts:'—'});
+    if(c.fechaLimite && c.fase!=='disposicion'){
+      const diasRestantes=Math.ceil((new Date(c.fechaLimite)-now)/86400000);
+      if(diasRestantes<0) alerts.push({type:'danger',icon:'🔴',title:`${c.id} — Fecha límite VENCIDA`,desc:`Disposición final vencida el ${c.fechaLimite} | Fase actual: ${PH_LABEL[c.fase]}`,ts:c.fechaLimite});
+      else if(diasRestantes<=3) alerts.push({type:'warn',icon:'⏰',title:`${c.id} — Disposición vence en ${diasRestantes} día${diasRestantes!==1?'s':''}`,desc:`Fecha límite: ${c.fechaLimite} | Fase actual: ${PH_LABEL[c.fase]}`,ts:c.fechaLimite});
+    }
+  });
+  return alerts;
+}
+function renderAlertas(){
+  const alerts=getAlertas();
+  document.getElementById('alertBadge').textContent=alerts.length;
+  const el=document.getElementById('alertList');
+  const em=document.getElementById('alertEmpty');
+  if(!alerts.length){el.innerHTML='';em.style.display='block';return;}
+  em.style.display='none';
+  el.innerHTML=alerts.map(a=>`
+    <div class="alert-row ${a.type==='warn'?'warn':''}">
+      <span class="alert-ico">${a.icon}</span>
+      <div class="alert-content"><div class="alert-title">${a.title}</div><div class="alert-desc">${a.desc}</div></div>
+      <span class="alert-time">${a.ts}</span>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════
+//  HISTORIAL
+// ══════════════════════════════════════
+function renderHistory(){
+  const q=(document.getElementById('histSearch')||{value:''}).value.toLowerCase();
+  let log=[...globalLog].reverse().filter(r=>!q||r.cid.toLowerCase().includes(q)||r.action.toLowerCase().includes(q));
+  const tb=document.getElementById('histBody');
+  const em=document.getElementById('histEmpty');
+  if(!log.length){tb.innerHTML='';em.style.display='block';return;}
+  em.style.display='none';
+  tb.innerHTML=log.map(r=>`
+    <tr>
+      <td>${r.cid}</td><td>${r.action}</td>
+      <td>${r.from?PH_LABEL[r.from]||r.from:'—'}</td>
+      <td>${r.to?PH_LABEL[r.to]||r.to:'—'}</td>
+      <td>${r.user}</td><td>${r.ts}</td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════
+//  MAPA
+// ══════════════════════════════════════
+function renderMapa(){
+  const inTransit=containers.filter(c=>c.fase==='transito_ida'||c.fase==='transito_vuelta');
+  const el=document.getElementById('transitPanel');
+  if(!inTransit.length){el.innerHTML='<div style="font-size:12px;color:var(--text3);">Sin contenedores en tránsito activo.</div>';return;}
+  el.innerHTML=inTransit.map(c=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:8px;background:var(--bg3);border:1px solid var(--purple);border-radius:var(--r);margin-bottom:8px;">
+      <span style="font-size:20px;">${c.fase==='transito_vuelta'?'🚚':'🚛'}</span>
+      <div style="flex:1;"><div style="font-size:12px;font-family:IBM Plex Mono,monospace;font-weight:600;color:var(--purple);">${c.id} <span style="font-size:10px;opacity:.7;">${c.fase==='transito_vuelta'?'↩ vuelta':'→ ida'}</span></div>
+        <div style="font-size:11px;color:var(--text2);">${c.desc} · ${c.m3} m³ · ${c.conductor}</div></div>
+      <div style="font-size:10px;font-family:IBM Plex Mono,monospace;color:var(--text3);text-align:right;">
+        <div>Camión: ${c.camion}</div>${c.salida?`<div>Salida: ${c.salida}</div>`:''}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════
+//  MODAL NUEVO CONTENEDOR
+// ══════════════════════════════════════
+function actualizarContenedores() {
+  const cant = parseInt(document.getElementById('f-cant-cont').value) || 1;
+  for (let i = 1; i <= 4; i++) {
+    const bloque = document.getElementById('cont-bloque-' + i);
+    if (bloque) bloque.style.display = i <= cant ? 'block' : 'none';
+  }
+}
+
+function openModal(){
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('f-salida').value=today;
+  const currentYear = new Date().getFullYear();
+  document.getElementById('f-id').value=`CTR-${currentYear}-${String(containers.length+1).padStart(3,'0')}`;
+  document.getElementById('modalOverlay').classList.add('open');
+  const btn=document.getElementById('btnRegistrar');
+  btn.textContent = SHEETS_URL ? '💾 Registrar en Sheets' : '💾 Registrar (local)';
+  // reset foto
+  clearFoto();
+  document.getElementById('f-obs').value='';
+  document.getElementById('f-km-salida').value='';
+  document.getElementById('f-km-llegada').value='';
+  document.getElementById('f-fecha-limite').value='';
+  document.getElementById('f-tara-camion').value='';
+  // reset container blocks
+  actualizarContenedores();
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function overlayClick(e,id){if(e.target===document.getElementById(id))closeModal(id);}
+
+async function submitForm(){
+  const id=document.getElementById('f-id').value.trim();
+  const tipo=document.getElementById('f-tipo').value;
+  const m3=parseFloat(document.getElementById('f-m3').value);
+  const fase=document.getElementById('f-fase').value;
+  const conductor=document.getElementById('f-conductor').value.trim();
+  const camion=document.getElementById('f-camion').value.trim();
+  const desc=document.getElementById('f-desc').value.trim()||tipo;
+  const salida=document.getElementById('f-salida').value||null;
+  const llegada=document.getElementById('f-llegada').value||null;
+  const empresaGeneradora=document.getElementById('f-empresa-gen').value.trim();
+  const empresaTransportista=document.getElementById('f-empresa-tra').value.trim();
+  const nOrdenTransporte=document.getElementById('f-orden').value.trim();
+  const nManifiesto=document.getElementById('f-manifiesto').value.trim();
+  const regCamion=document.getElementById('f-reg-camion').value.trim();
+  const semirremolque=document.getElementById('f-semirremolque').value;
+  const taraCamion=parseFloat(document.getElementById('f-tara-camion').value)||0;
+  const cantContenedores=parseInt(document.getElementById('f-cant-cont').value)||1;
+  const fechaLimite=document.getElementById('f-fecha-limite').value||null;
+  const kmSalida=parseInt(document.getElementById('f-km-salida').value)||0;
+  const kmLlegada=parseInt(document.getElementById('f-km-llegada').value)||0;
+  const observaciones=document.getElementById('f-obs').value.trim();
+  const fotoBase64=document.getElementById('f-foto')._base64||null;
+
+  // Recolectar registros individuales de cada contenedor
+  const registrosContenedores = [];
+  for (let i = 1; i <= cantContenedores; i++) {
+    registrosContenedores.push({
+      registro: (document.getElementById('f-reg-cont-' + i)||{value:''}).value.trim(),
+      pct: parseInt((document.getElementById('f-pct-' + i)||{value:'0'}).value) || 0,
+      pesoKg: parseFloat((document.getElementById('f-peso-' + i)||{value:''}).value) || 0,
+      tara: parseFloat((document.getElementById('f-tara-' + i)||{value:''}).value) || 0,
+    });
+  }
+  // Para compatibilidad con campos legacy usamos el primero
+  const regContenedor = registrosContenedores[0]?.registro || '';
+  const pctLlenado    = registrosContenedores[0]?.pct || 0;
+
+  if(!id||!conductor||!camion||isNaN(m3)||m3<=0){
+    showToast('⚠️','Completar: ID, conductor, camión y volumen.','error');return;
+  }
+  if(containers.find(c=>c.id===id)){
+    showToast('⚠️','Ya existe un contenedor con ese ID.','error');return;
+  }
+
+  const pesoKg = registrosContenedores.reduce((s,r)=>s+(r.pesoKg||0),0);
+  const pesoBruto = taraCamion > 0 && pesoKg > 0 ? taraCamion + pesoKg : 0;
+  const newContainer={id,tipo,desc,m3,fase,conductor,camion,salida,llegada,firma:null,
+    empresaGeneradora,empresaTransportista,pctLlenado,nOrdenTransporte,nManifiesto,
+    regCamion,regContenedor,cantContenedores,semirremolque,registrosContenedores,
+    pesoKg, taraCamion, pesoBruto, fechaLimite, kmSalida, kmLlegada, observaciones, foto:fotoBase64};
+
+  const btn=document.getElementById('btnRegistrar');
+  btn.disabled=true;
+  btn.textContent='⏳ Guardando...';
+
+  // 1. Guardar en Sheets (si hay URL)
+  if(SHEETS_URL){
+    try{
+      showLoading('Guardando en Google Sheets...');
+      await guardarContenedorSheets(newContainer);
+      hideLoading();
+      showToast('✅',`${id} guardado en Google Sheets ✓`,'success');
+    } catch(err){
+      hideLoading();
+      showToast('⚠️',`Error en Sheets: ${err.message} — guardado solo localmente`,'error');
+    }
+  } else {
+    showToast('💾',`${id} guardado localmente (sin URL de Sheets)`,'loading');
+  }
+
+  // 2. Actualizar memoria local
+  containers.unshift(newContainer);
+  containerLog[id]=[];
+  const ts=new Date().toISOString().slice(0,16).replace('T',' ');
+  containerLog[id].push({action:'Contenedor registrado',fase,ts,user:'Admin'});
+  globalLog.push({cid:id,action:'Contenedor creado',from:null,to:fase,user:'Admin',ts});
+  expanded.add(id);
+
+  btn.disabled=false;
+  btn.textContent= SHEETS_URL ? '💾 Registrar en Sheets' : '💾 Registrar (local)';
+  closeModal('modalOverlay');
+  showView('contenedores');
+  renderDashboard();
+}
+
+// ══════════════════════════════════════
+//  EXPORTAR PDF
+// ══════════════════════════════════════
+function exportPDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(240,163,0);
+  doc.text('ResTrack — Trazabilidad de Residuos Mineros',14,18);
+  doc.setFontSize(10);doc.setTextColor(139,148,158);
+  doc.text(`Generado: ${new Date().toLocaleString('es-CL')} | Fuente: ${SHEETS_URL?'Google Sheets':'Local'}`,14,26);
+  doc.setDrawColor(48,54,61);doc.line(14,30,283,30);
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(230,237,243);
+  doc.text(`Total: ${containers.length} contenedores`,14,40);
+  doc.text(`Volumen: ${containers.reduce((s,c)=>s+c.m3,0).toFixed(1)} m³`,80,40);
+  doc.text(`En tránsito: ${containers.filter(c=>c.fase==='transito_ida'||c.fase==='transito_vuelta').length}`,160,40);
+  doc.text(`Completados: ${containers.filter(c=>c.fase==='disposicion').length}`,220,40);
+  const cols=['ID','Tipo','Empresa Gen.','Empresa Tra.','m³','%','Fase','N° OT','N° Man.','Reg.Cam.','Reg.Cont.','Cant.','Conductor','Salida'];
+  const rows=containers.map(c=>[
+    c.id,c.tipo,(c.empresaGeneradora||'—').substring(0,14),(c.empresaTransportista||'—').substring(0,14),
+    c.m3.toFixed(1),(c.pctLlenado||0)+'%',PH_LABEL[c.fase].split(' ')[0],
+    c.nOrdenTransporte||'—',c.nManifiesto||'—',c.regCamion||'—',c.regContenedor||'—',
+    c.cantContenedores||1,c.conductor.split(' ').slice(0,2).join(' '),c.salida||'—'
+  ]);
+  let y=52;
+  doc.setFillColor(28,34,48);doc.rect(14,y-5,269,8,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(240,163,0);
+  const ws=[22,14,24,24,10,9,20,20,20,16,16,10,26,18];
+  let x=14;cols.forEach((c,i)=>{doc.text(c,x,y);x+=ws[i];});
+  y+=6;doc.setFont('helvetica','normal');doc.setTextColor(230,237,243);
+  rows.forEach((row,ri)=>{
+    if(y>185){doc.addPage();y=20;}
+    if(ri%2===0){doc.setFillColor(22,27,34);doc.rect(14,y-4,269,7,'F');}
+    doc.setFontSize(6.5);x=14;
+    row.forEach((cell,i)=>{doc.text(String(cell),x,y);x+=ws[i];});
+    y+=7;
+  });
+  doc.save('trazabilidad_residuos.pdf');
+  showToast('📄','PDF generado y descargado','success');
+}
+
+// ══════════════════════════════════════
+//  FOTO PREVIEW
+// ══════════════════════════════════════
+function previewFoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('⚠️', 'La foto supera 2MB. Usá una imagen más pequeña.', 'error');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    input._base64 = e.target.result;
+    document.getElementById('foto-img').src = e.target.result;
+    document.getElementById('foto-preview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+function clearFoto() {
+  const inp = document.getElementById('f-foto');
+  inp.value = '';
+  inp._base64 = null;
+  document.getElementById('foto-preview').style.display = 'none';
+  document.getElementById('foto-img').src = '';
+}
+
+// ══════════════════════════════════════
+//  LIMPIAR FILTROS
+// ══════════════════════════════════════
+function limpiarFiltros() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterFase').value = '';
+  document.getElementById('filterTipo').value = '';
+  const fd = document.getElementById('filterFechaDesde');
+  const fh = document.getElementById('filterFechaHasta');
+  if (fd) fd.value = '';
+  if (fh) fh.value = '';
+  renderCards();
+}
+
+// ══════════════════════════════════════
+//  EXPORTAR EXCEL (CSV descargable)
+// ══════════════════════════════════════
+function exportExcel() {
+  const headers = ['ID','Tipo','Descripción','m³','Fase','Empresa Gen.','Empresa Tra.','% Llenado','N° OT','N° Manifiesto','Reg. Camión','Reg. Contenedor','Cant. Cont.','Conductor','Patente','Tara Camión (kg)','Peso Neto (kg)','Peso Bruto (kg)','Km Salida','Km Llegada','Km Recorridos','Fecha Salida','Fecha Llegada','Fecha Límite','Semiremolque','Observaciones'];
+  const rows = containers.map(c => [
+    c.id, c.tipo, c.desc, c.m3.toFixed(1),
+    PH_LABEL[c.fase] || c.fase,
+    c.empresaGeneradora || '',
+    c.empresaTransportista || '',
+    (c.pctLlenado || 0) + '%',
+    c.nOrdenTransporte || '',
+    c.nManifiesto || '',
+    c.regCamion || '',
+    c.regContenedor || '',
+    c.cantContenedores || 1,
+    c.conductor,
+    c.camion,
+    c.taraCamion || '',
+    c.pesoKg || '',
+    c.pesoBruto || (c.taraCamion && c.pesoKg ? c.taraCamion + c.pesoKg : ''),
+    c.kmSalida || '',
+    c.kmLlegada || '',
+    (c.kmSalida && c.kmLlegada) ? (c.kmLlegada - c.kmSalida) : '',
+    c.salida || '',
+    c.llegada || '',
+    c.fechaLimite || '',
+    c.semirremolque || '',
+    (c.observaciones || '').replace(/,/g, ';')
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('
+');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'trazabilidad_residuos.csv';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('📊', 'Excel (CSV) generado y descargado', 'success');
+}
+
+// ══════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════
+let toastTimer=null;
+function showToast(icon,msg,type='success'){
+  const t=document.getElementById('toast');
+  document.getElementById('toastIcon').textContent=icon;
+  document.getElementById('toastMsg').textContent=msg;
+  t.className='toast '+type+' show';
+  if(toastTimer)clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.className='toast',4000);
+}
+function showLoading(txt='Procesando...'){
+  document.getElementById('loadingText').textContent=txt;
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+}
+function hideLoading(){document.getElementById('loadingOverlay').classList.add('hidden');}
+
+// ══════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════
+(function init(){
+  if(!SHEETS_URL){
+    document.getElementById('configBanner').style.display='flex';
+    setOnline(false);
+    renderDashboard();
+    renderAlertas();
+  } else {
+    reloadFromSheets();
+  }
+  setInterval(()=>{
+    const n=getAlertas().length;
+    document.getElementById('alertBadge').textContent=n;
+  },10000);
+})();
+</script>
+</body>
+</html>
